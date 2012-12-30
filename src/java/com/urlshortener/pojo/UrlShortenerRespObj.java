@@ -14,22 +14,29 @@ import org.apache.log4j.Logger;
 public class UrlShortenerRespObj {
     
     private Logger log = Logger.getLogger(UrlShortenerRespObj.class);
-    private Error error;
+    private HttpResponseCode httpCode;
     private String redirectUrl;
+    private String responseBody;
     
-    public UrlShortenerRespObj(Error error) {
-        this.error = error;
+    public UrlShortenerRespObj() {
     }
+    
     public UrlShortenerRespObj(String redirectUrl) {
+        this.httpCode = HttpResponseCode.REDIRECT;
         this.redirectUrl = redirectUrl;
     }
     
-    
-    public Error getError() {
-        return this.error;
+    public void setResponseBody(String body) {
+        this.responseBody = body;
     }
-    public void setError(Error e) {
-        this.error = e;
+    public String getResponseBody() {
+        return this.responseBody;
+    }
+    public HttpResponseCode getHttpResponseCode() {
+        return this.httpCode;
+    }
+    public void setHttpResponseCode(HttpResponseCode e) {
+        this.httpCode = e;
     }
     
     public String getRedirectUrl() {
@@ -39,19 +46,27 @@ public class UrlShortenerRespObj {
         this.redirectUrl = redirectUrl;
     }
     
-    public enum Error {
+    public enum HttpResponseCode {
+        REDIRECT,
         ERROR_NO_URL_FOUND,
-        ERROR_REDIRECT_FAILED;
+        ERROR_REDIRECT_FAILED,
+        GENERAL_ERROR;
         
-        public int getHttpErrorCode(Error e) {
-            int r = 504;
+        public static int getHttpIntCode(HttpResponseCode e) {
+            int r = 200;
             switch (e) {
+                case REDIRECT:
+                    r = 302;
+                    break;
                 case ERROR_NO_URL_FOUND:
                     r = 503;
-                    
+                    break;
                 case ERROR_REDIRECT_FAILED:
                     r = 502;
-                    
+                    break;
+                case GENERAL_ERROR:
+                    r = 500;
+                    break;
             }
             return r;
         }

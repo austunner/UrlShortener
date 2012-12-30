@@ -31,4 +31,14 @@ public final class HttpUtils {
         return headers; 
     }
     
+    public static Map<String, String> getQueryParams(Map<String, String[]> params) {
+        Map<String, String> ret = new HashMap<String, String>(params.size());
+        
+        for (String key : params.keySet()) {
+            ret.put(key, params.get(key)[0]);
+        }
+        
+        return ret;
+    }
+    
 }

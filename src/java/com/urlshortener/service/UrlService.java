@@ -10,6 +10,7 @@ import com.urlshortener.jms.SendService;
 import com.urlshortener.manager.UrlManager;
 import com.urlshortener.pojo.UrlShortenerReqObj;
 import com.urlshortener.pojo.UrlShortenerReqObj.UrlShortenerRequestType;
+import com.urlshortener.pojo.UrlShortenerRespObj;
 import com.urlshortener.utils.HttpUtils;
 import com.urlshortener.utils.JsonUtils;
 import java.io.BufferedReader;
@@ -54,127 +55,84 @@ public class UrlService {
      * @param get
      * @param response 
      */
-    public void processGet(HttpServletRequest get, HttpServletResponse response) {
-        Cookie[] cookies = get.getCookies();
-        Map<String, String> headers = HttpUtils.getHeaders(get);
+    public UrlShortenerRespObj processGet(UrlShortenerReqObj requestObj) {
         
-        Map<String, Object> paramMap = get.getParameterMap();
-        log.debug("HTTP GET params: " + paramMap);
+        UrlShortenerRespObj respObj = new UrlShortenerRespObj();
         
-        UrlShortenerReqObj pojo = new UrlShortenerReqObj(headers, paramMap, get.getPathInfo(), UrlShortenerRequestType.LOOKUP);
-        
-        if (pojo.getRequestBodyContentMap().containsKey("urlid")) {
-            String urlid = ((String[])pojo.getRequestBodyContentMap().get("urlid"))[0];
-            
-            
-            Url lookupUrl = this.urlManager.getUrlById(Long.parseLong(urlid));
-            
-            log.debug("Looked up by url id " + urlid +" for: " + lookupUrl);
-            
-            try {
-                PrintWriter out = response.getWriter();
-                out.println("found " + lookupUrl);
-                out.flush();
-                out.close();
-            } catch (Exception e) {
-                response.setStatus(503);
-                log.error(e);
-            }
-        }
-        
-        else {
-            /// UrlShortener, /heyyo, http://localhost:8080/UrlShortener/heyyo
-            // return get.getContextPath() +", " + get.getPathInfo() + ", " + get.getRequestURL().toString();
-            Url lookupUrl = urlManager.getUrlByShortUrl(get.getPathInfo());
-            
-            if (lookupUrl != null) {
-                String longUrl = lookupUrl.getUrl();
-                try {
-                    response.sendRedirect(longUrl);
-                } catch (Exception e) {
-                    response.setStatus(504);
-                    log.error("exception", e);
-                    
-                }
-            } else {
-                log.debug("Couldn't find the look up url in the datastore: " + get.getPathInfo());
-                response.setStatus(503);
-            }
-            
-        }
-        
-        sendService.sendStats(pojo.toString());
-    }
-    
-    public String processPost(HttpServletRequest post) throws Exception {
-        Cookie[] cookies = post.getCookies();
-        Map<String, String> headers = HttpUtils.getHeaders(post);
-        
-        BufferedReader bf = post.getReader();
-        Map<String, Object> content = JsonUtils.parseToMap(bf);
-        
-        log.debug("HTTP POST content: " + content);
-        
-        UrlShortenerReqObj pojo = new UrlShortenerReqObj(headers, content, post.getPathInfo(), UrlShortenerRequestType.CREATE);
-        pojo.validateAndCleanupRequest();
-        
-        String response = "";
-        // Handle query that requests for ALL objects
-        
-        if (post.getParameterMap().containsKey("all")) {
-            
-            String[] vals = (String[])post.getParameterMap().get("all");
-            if (vals.length == 1) {
-                
-                String val = vals[0];
-                if (StringUtils.equalsIgnoreCase(val, "user")) {
-                    
-                }
-            }
+        if (requestObj.getQueryParams().containsKey("all")) {
             
             log.debug("Returning all urls in DB");
             StringBuilder sb = new StringBuilder();
+            
             for (Url url : this.urlManager.getAllUrls()) {
                 sb.append(url.toString()).append("\n");
             }
-            response = sb.toString();
+            
+            respObj.setResponseBody(sb.toString());
+            
+        } else {
+            /// UrlShortener, /heyyo, http://localhost:8080/UrlShortener/heyyo
+            // return get.getContextPath() +", " + get.getPathInfo() + ", " + get.getRequestURL().toString();
+            Url lookupUrl = urlManager.getUrlByShortUrl(requestObj.getRequestResource());
+            
+            if (lookupUrl != null) {
+                String longUrl = lookupUrl.getUrl();
+                
+                respObj = new UrlShortenerRespObj(longUrl);
+                    
+            } else {
+                log.debug("Couldn't find the look up url in the datastore: " + requestObj.getRequestResource());
+                respObj.setHttpResponseCode(UrlShortenerRespObj.HttpResponseCode.ERROR_NO_URL_FOUND);
+                respObj.setResponseBody("Short url DNE in datastore");
+            }
+            
         }
+        
+        sendService.sendStats(requestObj.toString());
+        return respObj;
+    }
+    
+    public UrlShortenerRespObj processPost(UrlShortenerReqObj post) throws Exception {
+        
+        post.validateAndCleanupRequest();
+        
+        UrlShortenerRespObj resp = new UrlShortenerRespObj();
         
         // check if url already exists, or create new url and user obj is not already
         
-        String urlStr = (String)pojo.getRequestBodyContentMap().get(UrlShortenerReqObj.URL_KEY);
+        String urlStr = (String)post.getRequestBodyContentMap().get(UrlShortenerReqObj.URL_KEY);
         Url urlObj = this.urlManager.getUrlByTargetUrl(urlStr);
         
         if (urlObj != null) {
             log.debug("Url exists already");
             
-            response = urlObj.toString();
+            resp.setResponseBody(urlObj.getUrl() + " exists already as " + urlObj.getUrlshort());
             
         } else {
+            
             log.debug("Creating new user, url objects");
             User user = new User();
             user.setIpaddr(post.getRemoteAddr());
-            user.setUserAgent(headers.get("user-agent"));
-            //user.setUserAgent(post.getHeader("User-Agent"));
+            user.setUserAgent(post.getHeaders().get("user-agent"));
             
-            String fullTargetUrl = (String)pojo.getRequestBodyContentMap().get(UrlShortenerReqObj.URL_KEY);
+            String fullTargetUrl = (String)post.getRequestBodyContentMap().get(UrlShortenerReqObj.URL_KEY);
             Url url = new Url();
             url.setDate_created(new Date(System.currentTimeMillis()));
             url.setUser(user);
             url.setUrl(fullTargetUrl);
-            url.setUrlshort(generateShortUrl((String)pojo.getRequestBodyContentMap().get(UrlShortenerReqObj.URL_KEY)));
-            this.datastoreSvcs.save(user);
+            url.setUrlshort(generateShortUrl((String)post.getRequestBodyContentMap().get(UrlShortenerReqObj.URL_KEY)));
             
+            this.datastoreSvcs.save(user);
             this.datastoreSvcs.commit();
             
             this.datastoreSvcs.save(url);
             this.datastoreSvcs.commit();
             
-            response = "Created new database entries: " + url.toString();
+            resp.setResponseBody(urlObj.getUrl() + " is shrunked down to " + urlObj.getUrlshort());
         }
         
-        sendService.sendStats(pojo.toString());
-        return response;
+        sendService.sendStats(post.toString());
+        return resp;
     }
     /**
      * http://localhost:8080/UrlShortener/<datastore id>/<short url key>
