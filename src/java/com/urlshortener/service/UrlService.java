@@ -6,12 +6,13 @@ package com.urlshortener.service;
 
 import com.urlshortener.hibernate.pojo.Url;
 import com.urlshortener.hibernate.pojo.User;
+import com.urlshortener.jms.SendService;
 import com.urlshortener.manager.UrlManager;
 import com.urlshortener.pojo.UrlShortenerReqObj;
+import com.urlshortener.pojo.UrlShortenerReqObj.UrlShortenerRequestType;
 import com.urlshortener.utils.HttpUtils;
 import com.urlshortener.utils.JsonUtils;
 import java.io.BufferedReader;
-import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.Date;
 import java.util.Map;
@@ -30,10 +31,22 @@ public class UrlService {
     private Logger log = Logger.getLogger(UrlService.class);
     private final DatastoreService datastoreSvcs;
     private final UrlManager urlManager;
+    private final SendService sendService;
     
-    public UrlService(DatastoreService datastoreSvcs) {
+    public UrlService(DatastoreService datastoreSvcs, SendService sendService) {
         this.datastoreSvcs = datastoreSvcs;
+        this.sendService = sendService;
         this.urlManager = new UrlManager(datastoreSvcs);
+        
+        //testJMS();
+    }
+    
+    private void testJMS() {
+        
+        log.debug("Testing JMS");
+        for(int i =1; i<=5; i++) {
+            sendService.sendStats("testing " +i);
+        }
     }
     
     /**
@@ -48,7 +61,7 @@ public class UrlService {
         Map<String, Object> paramMap = get.getParameterMap();
         log.debug("HTTP GET params: " + paramMap);
         
-        UrlShortenerReqObj pojo = new UrlShortenerReqObj(headers, paramMap);
+        UrlShortenerReqObj pojo = new UrlShortenerReqObj(headers, paramMap, get.getPathInfo(), UrlShortenerRequestType.LOOKUP);
         
         if (pojo.getRequestBodyContentMap().containsKey("urlid")) {
             String urlid = ((String[])pojo.getRequestBodyContentMap().get("urlid"))[0];
@@ -84,11 +97,13 @@ public class UrlService {
                     
                 }
             } else {
-                log.debug("Couldn't find the look up url in the datastore: " + lookupUrl.getUrl());
+                log.debug("Couldn't find the look up url in the datastore: " + get.getPathInfo());
                 response.setStatus(503);
             }
             
         }
+        
+        sendService.sendStats(pojo.toString());
     }
     
     public String processPost(HttpServletRequest post) throws Exception {
@@ -100,10 +115,10 @@ public class UrlService {
         
         log.debug("HTTP POST content: " + content);
         
-        UrlShortenerReqObj pojo = new UrlShortenerReqObj(headers, content);
+        UrlShortenerReqObj pojo = new UrlShortenerReqObj(headers, content, post.getPathInfo(), UrlShortenerRequestType.CREATE);
         pojo.validateAndCleanupRequest();
         
-        
+        String response = "";
         // Handle query that requests for ALL objects
         
         if (post.getParameterMap().containsKey("all")) {
@@ -122,7 +137,7 @@ public class UrlService {
             for (Url url : this.urlManager.getAllUrls()) {
                 sb.append(url.toString()).append("\n");
             }
-            return sb.toString();
+            response = sb.toString();
         }
         
         // check if url already exists, or create new url and user obj is not already
@@ -133,7 +148,7 @@ public class UrlService {
         if (urlObj != null) {
             log.debug("Url exists already");
             
-            return urlObj.toString();
+            response = urlObj.toString();
             
         } else {
             log.debug("Creating new user, url objects");
@@ -155,9 +170,11 @@ public class UrlService {
             this.datastoreSvcs.save(url);
             this.datastoreSvcs.commit();
             
-            return "Created new database entries: " + url.toString();
+            response = "Created new database entries: " + url.toString();
         }
         
+        sendService.sendStats(pojo.toString());
+        return response;
     }
     /**
      * http://localhost:8080/UrlShortener/<datastore id>/<short url key>

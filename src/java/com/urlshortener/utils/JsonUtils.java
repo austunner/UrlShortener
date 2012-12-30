@@ -24,9 +24,13 @@ public final class JsonUtils {
     
     private JsonUtils() {}
     
-    public static Map<String, Object> parseToMap(Reader reader) throws IOException {
-        Map<String, Object> map = jom.readValue(reader, Map.class);
-        
-        return map;
+    public static Map<String, Object> parseToMap(Reader reader) {
+        try {
+            Map<String, Object> map = jom.readValue(reader, Map.class);
+            
+            return map;
+        } catch (Exception e) {
+            return null;
+        }
     }
 }

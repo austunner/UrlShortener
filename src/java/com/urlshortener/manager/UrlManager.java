@@ -7,7 +7,6 @@ package com.urlshortener.manager;
 import com.urlshortener.hibernate.pojo.Url;
 import com.urlshortener.service.DatastoreService;
 import java.util.List;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.log4j.Logger;
 import org.hibernate.Session;
 
