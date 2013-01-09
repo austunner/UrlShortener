@@ -30,6 +30,13 @@ and open the template in the editor.
         <constructor-arg ref="jmsTemplate"/>
     </bean>
     
+    <bean id="ReceiveService" class="com.urlshortener.jms.ReceiveService">
+    </bean>
+    
+    <jms:listener-container  connection-factory="connectionFactory">
+     <jms:listener destination="statsQueue" ref="ReceiveService" method="receiveStats" />
+    </jms:listener-container>     
+    
     <!--  Embedded ActiveMQ Broker -->
     <context:component-scan base-package="com.urlshortener.jms" />
     <bean id="connectionFactory" class="org.apache.activemq.ActiveMQConnectionFactory">
