@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+To change this template, choose Tools | Templates
+and open the template in the editor.
+-->
+
+
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:context="http://www.springframework.org/schema/context"
+        xmlns:jms="http://www.springframework.org/schema/jms"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans
+            http://www.springframework.org/schema/beans/spring-beans.xsd
+             http://www.springframework.org/schema/context 
+                           http://www.springframework.org/schema/context/spring-context.xsd
+                           http://www.springframework.org/schema/jms 
+                           http://www.springframework.org/schema/jms/spring-jms.xsd
+                           http://activemq.apache.org/schema/core 
+                           http://activemq.apache.org/schema/core/activemq-core.xsd">
+    
+    <bean id="UrlService" class="com.urlshortener.service.UrlService">
+        <constructor-arg ref="DatastoreService" />
+        <constructor-arg ref="SendService" />
+    </bean>
+    
+    <bean id="DatastoreService" class="com.urlshortener.service.DatastoreService">
+    </bean>
+    
+    <bean id="SendService" class="com.urlshortener.jms.SendService">
+        <constructor-arg ref="jmsTemplate"/>
+    </bean>
+    
+    <bean id="ReceiveService" class="com.urlshortener.jms.ReceiveService">
+    </bean>
+    
+    <jms:listener-container  connection-factory="connectionFactory">
+     <jms:listener destination="statsQueue" ref="ReceiveService" method="receiveStats" />
+    </jms:listener-container>     
+    
+    <!--  Embedded ActiveMQ Broker -->
+    <context:component-scan base-package="com.urlshortener.jms" />
+    <bean id="connectionFactory" class="org.apache.activemq.ActiveMQConnectionFactory">
+        <property name="brokerURL">
+            <value>tcp://localhost:61616</value>
+        </property>
+    </bean>
+    
+    <bean id="destination" class="org.apache.activemq.command.ActiveMQQueue">
+        <constructor-arg value="statsQueue"/>
+    </bean>
+    
+    <bean id="jmsTemplate" class="org.springframework.jms.core.JmsTemplate">
+        <property name="connectionFactory" ref="connectionFactory" />
+        <property name="defaultDestination" ref="destination" />
+    </bean>
+
+
+</beans>
