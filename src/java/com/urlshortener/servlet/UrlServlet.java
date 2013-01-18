@@ -51,7 +51,7 @@ public class UrlServlet extends HttpServlet {
             if (HttpResponseCode.REDIRECT == resp.getHttpResponseCode()) {
                 response.sendRedirect(resp.getRedirectUrl());
             } else {
-                
+                log.debug("returning " + resp.toString());
                 response.setStatus(HttpResponseCode.getHttpIntCode(resp.getHttpResponseCode()));
                 PrintWriter out = response.getWriter();
                 out.println(resp.getResponseBody());

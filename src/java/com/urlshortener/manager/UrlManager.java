@@ -6,6 +6,7 @@ package com.urlshortener.manager;
 
 import com.urlshortener.hibernate.pojo.Url;
 import com.urlshortener.service.DatastoreService;
+import java.math.BigInteger;
 import java.util.List;
 import org.apache.log4j.Logger;
 import org.hibernate.Session;
@@ -23,10 +24,14 @@ public class UrlManager {
         this.datastoreSvcs = datastoreSvcs;
     }
     
+    /**
+     * Latest 200
+     * @return 
+     */
     public List<Url> getAllUrls() {
         Session s = datastoreSvcs.getSession();
         
-        return s.createSQLQuery("SELECT * FROM url")
+        return s.createSQLQuery("SELECT * FROM url u ORDER BY u.date_created ASC")
                 .addEntity(Url.class)
                 .setMaxResults(100)
                 .list();
@@ -54,6 +59,12 @@ public class UrlManager {
                 .addEntity(Url.class)
                 .uniqueResult();
         
+    }
+    
+    public boolean isShortUrlExist(String url) {
+        Session s = datastoreSvcs.getSession();
+        int count = ((BigInteger)s.createSQLQuery("SELECT count(*) from url where url.url_short='" +url+ "' limit 1").uniqueResult()).intValue();
+        return count > 0 ? true : false;
     }
 
 }

@@ -19,6 +19,7 @@ public class UrlShortenerRespObj {
     private String responseBody;
     
     public UrlShortenerRespObj() {
+        this.httpCode = HttpResponseCode.GENERAL_ERROR;
     }
     
     public UrlShortenerRespObj(String redirectUrl) {
@@ -26,6 +27,12 @@ public class UrlShortenerRespObj {
         this.redirectUrl = redirectUrl;
     }
     
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("httpcode=" + httpCode.toString() + "\n"
+                + "redirectUrl=" + redirectUrl);
+        return sb.toString();
+    }
     public void setResponseBody(String body) {
         this.responseBody = body;
     }
@@ -65,7 +72,7 @@ public class UrlShortenerRespObj {
                     r = 502;
                     break;
                 case GENERAL_ERROR:
-                    r = 500;
+                    r = 504;
                     break;
             }
             return r;

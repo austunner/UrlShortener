@@ -53,6 +53,8 @@ public class UrlService {
     /**
      * 
      * @param get
+     * ?all&=fetch all from db (latest 200 created)
+     * /{shorturl} - this will 302 redirect
      * @param response 
      */
     public UrlShortenerRespObj processGet(UrlShortenerReqObj requestObj) {
@@ -92,6 +94,12 @@ public class UrlService {
         return respObj;
     }
     
+    /**
+     * 
+     * @param post - json body with "url" as key
+     * @return
+     * @throws Exception 
+     */
     public UrlShortenerRespObj processPost(UrlShortenerReqObj post) throws Exception {
         
         post.validateAndCleanupRequest();
@@ -101,12 +109,12 @@ public class UrlService {
         // check if url already exists, or create new url and user obj is not already
         
         String urlStr = (String)post.getRequestBodyContentMap().get(UrlShortenerReqObj.URL_KEY);
+        
         Url urlObj = this.urlManager.getUrlByTargetUrl(urlStr);
         
         if (urlObj != null) {
-            log.debug("Url exists already");
             
-            resp.setResponseBody(urlObj.getUrl() + " exists already as " + urlObj.getUrlshort());
+            resp.setResponseBody(urlStr +" got shrunk to " + urlObj.getUrlshort());
             
         } else {
             
@@ -120,7 +128,7 @@ public class UrlService {
             url.setDate_created(new Date(System.currentTimeMillis()));
             url.setUser(user);
             url.setUrl(fullTargetUrl);
-            url.setUrlshort(generateShortUrl((String)post.getRequestBodyContentMap().get(UrlShortenerReqObj.URL_KEY)));
+            url.setUrlshort(generateShortUrl());
             
             this.datastoreSvcs.save(user);
             this.datastoreSvcs.commit();
@@ -128,7 +136,7 @@ public class UrlService {
             this.datastoreSvcs.save(url);
             this.datastoreSvcs.commit();
             
-            resp.setResponseBody(urlObj.getUrl() + " is shrunked down to " + urlObj.getUrlshort());
+            resp.setResponseBody(url.getUrl() + " is shrunken down to " + url.getUrlshort());
         }
         
         sendService.sendStats(post.toString());
@@ -142,13 +150,26 @@ public class UrlService {
      * @param targetUrl
      * @return 
      */
-    private String generateShortUrl(String targetUrl) {
+    private String generateShortUrl() {
         
         // determine which datastore id
         final String datastoreId = "/a/"; // hardcode for now.
         
-        
-        return datastoreId+generateRandomString(6);
+        String randVar = null;
+        // check if randVar clobbers anything.
+        int ctr = 0;
+        while(ctr < Integer.MAX_VALUE) {
+            randVar = generateRandomString(6);
+            if (!this.urlManager.isShortUrlExist(datastoreId+randVar)) {
+                break;
+            }
+            log.debug("clobbering..");
+            ctr++;
+        }
+        if (StringUtils.isBlank(randVar)) {
+            throw new RuntimeException("Couldn't find unique short url");
+        }
+        return datastoreId+randVar;
                 
     }
     
