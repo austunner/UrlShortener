@@ -3,6 +3,7 @@
  * and open the template in the editor.
  */
 package com.urlshortener.jms;
+import com.urlshortener.jms.StatsInfo.StatsType;
 import org.springframework.jms.core.JmsTemplate;
 import org.springframework.stereotype.Service;
 
@@ -22,9 +23,9 @@ public class SendService {
         this.statsSender = new SendManager(this.jmsTemplate);
     }
     
-    public void sendStats(String stats)
+    public void sendStats(String stats, StatsType type)
     {
-        StatsInfo order = new StatsInfo(stats);
+        StatsInfo order = new StatsInfo(stats, type);
         statsSender.pushStats(order);
     }
 

@@ -10,9 +10,17 @@ package com.urlshortener.jms;
  */
 public class StatsInfo {
     private String data;
-    
-    public StatsInfo(String data) {
+    private StatsType type;
+    public enum StatsType {
+        CREATE, GET
+    }
+    public StatsInfo(String data, StatsType type) {
         this.data = data;
+        this.type = type;
+    }
+    
+    public StatsType getStatsType() {
+        return this.type;
     }
     
     public String getData() {

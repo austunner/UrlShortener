@@ -7,6 +7,8 @@ package com.urlshortener.service;
 import com.urlshortener.hibernate.pojo.Url;
 import com.urlshortener.hibernate.pojo.User;
 import com.urlshortener.jms.SendService;
+import com.urlshortener.jms.StatsInfo;
+import com.urlshortener.jms.StatsInfo.StatsType;
 import com.urlshortener.manager.UrlManager;
 import com.urlshortener.pojo.UrlShortenerReqObj;
 import com.urlshortener.pojo.UrlShortenerReqObj.UrlShortenerRequestType;
@@ -18,6 +20,7 @@ import java.io.PrintWriter;
 import java.util.Date;
 import java.util.Map;
 import java.util.Random;
+import java.util.logging.Level;
 import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -33,22 +36,17 @@ public class UrlService {
     private final DatastoreService datastoreSvcs;
     private final UrlManager urlManager;
     private final SendService sendService;
+    private final CacheService cacheService;
     
-    public UrlService(DatastoreService datastoreSvcs, SendService sendService) {
+    public UrlService(DatastoreService datastoreSvcs, SendService sendService, CacheService cacheService) {
         this.datastoreSvcs = datastoreSvcs;
         this.sendService = sendService;
         this.urlManager = new UrlManager(datastoreSvcs);
+        this.cacheService = cacheService;
         
         //testJMS();
     }
     
-    private void testJMS() {
-        
-        log.debug("Testing JMS");
-        for(int i =1; i<=5; i++) {
-            sendService.sendStats("testing " +i);
-        }
-    }
     
     /**
      * 
@@ -70,6 +68,11 @@ public class UrlService {
                 sb.append(url.toString()).append("\n");
             }
             
+            sb.append("\n5 Most Recently Created:\n")
+                    .append(this.cacheService.get(CacheService.KEY_RECENTLY_CREATED))
+                    .append("\n\n5 Most Recently Accessed:\n")
+                    .append(this.cacheService.get(CacheService.KEY_RECENTLY_ACCESS));
+            
             respObj.setResponseBody(sb.toString());
             
         } else {
@@ -78,10 +81,16 @@ public class UrlService {
             Url lookupUrl = urlManager.getUrlByShortUrl(requestObj.getRequestResource());
             
             if (lookupUrl != null) {
-                String longUrl = lookupUrl.getUrl();
                 
+                String longUrl = lookupUrl.getUrl();
                 respObj = new UrlShortenerRespObj(longUrl);
-                    
+                try {
+                    log.debug("IN HERE!");
+                    this.cacheService.append(CacheService.KEY_RECENTLY_ACCESS, longUrl, 5);
+                } catch (Exception ex) {
+                    log.error("Cache error", ex);
+                }
+                
             } else {
                 log.debug("Couldn't find the look up url in the datastore: " + requestObj.getRequestResource());
                 respObj.setHttpResponseCode(UrlShortenerRespObj.HttpResponseCode.ERROR_NO_URL_FOUND);
@@ -90,7 +99,7 @@ public class UrlService {
             
         }
         
-        sendService.sendStats(requestObj.toString());
+        sendService.sendStats(requestObj.toString(), StatsType.GET);
         return respObj;
     }
     
@@ -136,10 +145,11 @@ public class UrlService {
             this.datastoreSvcs.save(url);
             this.datastoreSvcs.commit();
             
+            this.cacheService.append(CacheService.KEY_RECENTLY_CREATED, fullTargetUrl, 5);
             resp.setResponseBody(url.getUrl() + " is shrunken down to " + url.getUrlshort());
         }
         
-        sendService.sendStats(post.toString());
+        sendService.sendStats(post.toString(), StatsType.CREATE);
         return resp;
     }
     /**
