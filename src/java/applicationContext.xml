@@ -21,6 +21,7 @@ and open the template in the editor.
     <bean id="UrlService" class="com.urlshortener.service.UrlService">
         <constructor-arg ref="DatastoreService" />
         <constructor-arg ref="SendService" />
+        <constructor-arg ref="CacheService" />
     </bean>
     
     <bean id="DatastoreService" class="com.urlshortener.service.DatastoreService">
@@ -31,6 +32,9 @@ and open the template in the editor.
     </bean>
     
     <bean id="ReceiveService" class="com.urlshortener.jms.ReceiveService">
+    </bean>
+    
+    <bean id="CacheService" class="com.urlshortener.service.CacheService">
     </bean>
     
     <jms:listener-container  connection-factory="connectionFactory">
